@@ -108,7 +108,7 @@ X509 *pkcs11_get_certificates(void) {
             
             CK_ATTRIBUTE pattern[] = {
                 {CKA_CLASS, &class, sizeof(class)},
-                {CKA_LABEL, "Certificate for PIV Authentication", sizeof("Certificate for PIV Authentication") - 1}
+                {CKA_LABEL, "Certificate for Key Management", sizeof("Certificate for Key Management") - 1}
             };
 
             rv = m->C_FindObjectsInit(handle, pattern, 2);

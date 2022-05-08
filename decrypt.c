@@ -68,7 +68,7 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
             
             CK_ATTRIBUTE pattern[] = {
                 {CKA_CLASS, &class, sizeof(class)},
-                {CKA_LABEL, "PIV AUTH key", sizeof("PIV AUTH key") - 1}
+                {CKA_LABEL, "KEY MAN key", sizeof("KEY MAN key") - 1}
             };
 
             rv = m->C_FindObjectsInit(handle, pattern, 2);
