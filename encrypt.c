@@ -228,6 +228,8 @@ int main(void) {
         fail("Failed to acquire X509 certificate name");
     printf("Certifciate: %s\n", X509_NAME_oneline(name, NULL, 0));
     EVP_PKEY *pubkey2 = X509_get0_pubkey(cert);
+    if (EC_KEY_check_key(EVP_PKEY_get0_EC_KEY(pubkey2)) != 1)
+        fail("EC_KEY not valid");
     EVP_PKEY *pkey1 = generate_ec_key(EC_GROUP_get_curve_name(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pubkey2))));
     uint8_t hs[72];
     generate_hmac_shared_secret(pkey1, pubkey2, hs, 72);

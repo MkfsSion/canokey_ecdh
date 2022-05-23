@@ -94,6 +94,8 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
                 .ulSharedDataLen = 0,
             };
             EC_KEY *ec_pubkey1 = EVP_PKEY_get0_EC_KEY(pubkey1);
+            if (EC_KEY_check_key(ec_pubkey1) != 1)
+                fail("EC_KEY not valid");
             size_t len = EC_POINT_point2oct(EC_KEY_get0_group(ec_pubkey1), EC_KEY_get0_public_key(ec_pubkey1), POINT_CONVERSION_UNCOMPRESSED, NULL, 0, NULL);
             if(!len)
                 fail("EC_POINT_point2oct returns %zu", len);
