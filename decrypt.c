@@ -153,7 +153,7 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
             if (rv != CKR_OK)
                 fail("C_GetAttributeValue returns %s", p11_kit_strerror(rv));
             rv = m->C_DestroyObject(handle, newkey);
-            if (rv != CKR_OK)
+            if (rv != CKR_SESSION_READ_ONLY && rv != CKR_OK)
                 fail("C_DestroyObject returns %s", p11_kit_strerror(rv));
             m->C_CloseSession(handle);
             p11_kit_modules_finalize_and_release(modules);
