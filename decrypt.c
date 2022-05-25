@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+#include <openssl/core_names.h>
+#endif
 
 _Noreturn void fail(const char *format, ...) {
     assert(format);
@@ -93,16 +96,27 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
                 .pSharedData = NULL,
                 .ulSharedDataLen = 0,
             };
+            size_t len = 0;
+            uint8_t *buf = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+            if(EVP_PKEY_set_utf8_string_param(pubkey1, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_UNCOMPRESSED) != 1)
+                fail("Failed to set point-format to uncompressed");
+
+            len = EVP_PKEY_get1_encoded_public_key(pubkey1, &buf);
+            if (len == 0)
+                fail("Failed to get encoded public key");
+#else
             EC_KEY *ec_pubkey1 = EVP_PKEY_get0_EC_KEY(pubkey1);
             if (EC_KEY_check_key(ec_pubkey1) != 1)
                 fail("EC_KEY not valid");
-            size_t len = EC_POINT_point2oct(EC_KEY_get0_group(ec_pubkey1), EC_KEY_get0_public_key(ec_pubkey1), POINT_CONVERSION_UNCOMPRESSED, NULL, 0, NULL);
+            len = EC_POINT_point2oct(EC_KEY_get0_group(ec_pubkey1), EC_KEY_get0_public_key(ec_pubkey1), POINT_CONVERSION_UNCOMPRESSED, NULL, 0, NULL);
             if(!len)
                 fail("EC_POINT_point2oct returns %zu", len);
-            uint8_t *buf = OPENSSL_malloc(len);
+            buf = OPENSSL_malloc(len);
             len = EC_POINT_point2oct(EC_KEY_get0_group(ec_pubkey1), EC_KEY_get0_public_key(ec_pubkey1), POINT_CONVERSION_UNCOMPRESSED, buf, len, NULL);
             if (!len)
                 fail("EC_POINT_point2oct returns %zu", len);
+#endif
             params.pPublicData = buf;
             params.ulPublicDataLen = len;
             CK_BBOOL vtrue = CK_TRUE;
@@ -158,6 +172,7 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
             m->C_CloseSession(handle);
             p11_kit_modules_finalize_and_release(modules);
             *out_len = newkey_len;
+            OPENSSL_free(buf);
             return sk;
         }
     }

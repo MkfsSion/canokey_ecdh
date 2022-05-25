@@ -228,9 +228,26 @@ int main(void) {
         fail("Failed to acquire X509 certificate name");
     printf("Certifciate: %s\n", X509_NAME_oneline(name, NULL, 0));
     EVP_PKEY *pubkey2 = X509_get0_pubkey(cert);
+    int nid = NID_undef;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+    uint8_t *curve_name = NULL;
+    size_t len = 0;
+    if (!EVP_PKEY_get_group_name(pubkey2, NULL, 0, &len) || len == 0)
+        fail("Failed to determine curve group name length");
+    len += 1;
+    curve_name = OPENSSL_malloc(len);
+    if (!curve_name)
+        fail("Out of memory");
+    if (!EVP_PKEY_get_group_name(pubkey2, curve_name, len, &len))
+        fail("Failed to get curve group name");
+    nid = OBJ_sn2nid(curve_name);
+    OPENSSL_free(curve_name);
+#else
     if (EC_KEY_check_key(EVP_PKEY_get0_EC_KEY(pubkey2)) != 1)
         fail("EC_KEY not valid");
-    EVP_PKEY *pkey1 = generate_ec_key(EC_GROUP_get_curve_name(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pubkey2))));
+    nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pubkey2)));
+#endif
+    EVP_PKEY *pkey1 = generate_ec_key(nid);
     uint8_t hs[72];
     generate_hmac_shared_secret(pkey1, pubkey2, hs, 72);
     FILE *f = fopen("hkdf-secret.bin", "w");
