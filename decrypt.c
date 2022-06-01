@@ -36,9 +36,13 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
         CK_RV rv = CKR_OK;
         CK_ULONG n_slots = 0;
         CK_FUNCTION_LIST_PTR m = modules[i];
-        printf("Found module %s\n", p11_kit_module_get_name(m));
-        if (strncmp(p11_kit_module_get_name(m), "opensc", sizeof("opensc")) != 0)
+        const char *module_name = p11_kit_module_get_name(m);
+        printf("Found module %s\n", module_name);
+        if (strncmp(module_name, "opensc", sizeof("opensc")) != 0) {
+            m->C_Finalize(NULL_PTR);
+            free((void *)module_name);
             continue;
+        }
         rv = m->C_GetSlotList(CK_FALSE, NULL, &n_slots);
         if (rv != CKR_OK)
             fail("C_GetSlotList returns %s", p11_kit_strerror(rv));
@@ -152,7 +156,7 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
             if (!can_derive)
                 fail("The key object doesn't support derive");
             
-            rv = m->C_DeriveKey(handle, &mechanism, objects[0], newkey_template, sizeof(newkey_template)/ sizeof(CK_ATTRIBUTE), &newkey);
+            rv = m->C_DeriveKey(handle, &mechanism, objects[0], newkey_template, sizeof(newkey_template) / sizeof(CK_ATTRIBUTE), &newkey);
             if (rv != CKR_OK)
                 fail("C_DeriveKey returns %s", p11_kit_strerror(rv));
             CK_ATTRIBUTE sk_template = {
@@ -170,9 +174,12 @@ uint8_t *pkcs11_derive_shared_secret_malloc(EVP_PKEY *pubkey1, size_t *out_len) 
             if (rv != CKR_SESSION_READ_ONLY && rv != CKR_OK)
                 fail("C_DestroyObject returns %s", p11_kit_strerror(rv));
             m->C_CloseSession(handle);
+            m->C_Finalize(NULL_PTR);
             p11_kit_modules_finalize_and_release(modules);
             *out_len = newkey_len;
+            OPENSSL_free(slots);
             OPENSSL_free(buf);
+            free((void *)module_name);
             return sk;
         }
     }

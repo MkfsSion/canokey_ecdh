@@ -63,6 +63,7 @@ EVP_PKEY *generate_ec_key(int nid) {
     printf("EVP_PKEY with NID \"%s\" generated success\n", OBJ_nid2sn(nid));
     EVP_PKEY_CTX_free(pctx);
     EVP_PKEY_CTX_free(kctx);
+    EVP_PKEY_free(params);
     return ret;
 }
 
@@ -77,9 +78,13 @@ X509 *pkcs11_get_certificates(void) {
         CK_RV rv = CKR_OK;
         CK_ULONG n_slots = 0;
         CK_FUNCTION_LIST_PTR m = modules[i];
-        printf("Found module %s\n", p11_kit_module_get_name(m));
-        if (strncmp(p11_kit_module_get_name(m), "opensc", sizeof("opensc")) != 0)
+        const char *module_name = p11_kit_module_get_name(m);
+        printf("Found module %s\n", module_name);
+        if (strncmp(module_name, "opensc", sizeof("opensc")) != 0) {
+            free((void*)module_name);
+            m->C_Finalize(NULL_PTR);
             continue;
+        }
         rv = m->C_GetSlotList(CK_FALSE, NULL, &n_slots);
         if (rv != CKR_OK)
             fail("C_GetSlotList returns %s", p11_kit_strerror(rv));
@@ -142,6 +147,8 @@ X509 *pkcs11_get_certificates(void) {
             m->C_CloseSession(handle);
             free(slots);
             free(buffer);
+            free((void *)module_name);
+            m->C_Finalize(NULL_PTR);
             p11_kit_modules_finalize_and_release(modules);
             return cert;
         }
@@ -226,7 +233,8 @@ int main(void) {
     X509_NAME *name = X509_get_subject_name(cert);
     if (name == NULL)
         fail("Failed to acquire X509 certificate name");
-    printf("Certifciate: %s\n", X509_NAME_oneline(name, NULL, 0));
+    const char *subject = X509_NAME_oneline(name, NULL, 0);
+    printf("Certifciate: %s\n", subject);
     EVP_PKEY *pubkey2 = X509_get0_pubkey(cert);
     int nid = NID_undef;
 #if OPENSSL_VERSION_NUMBER >= 0x30000000
@@ -258,5 +266,6 @@ int main(void) {
     fclose(f);
     EVP_PKEY_free(pkey1);
     X509_free(cert);
+    free((void *)subject);
     return 0;
 }
